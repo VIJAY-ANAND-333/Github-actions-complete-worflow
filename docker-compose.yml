@@ -1,12 +1,55 @@
+version: "3.9"
+
 services:
   vijay_mod:
     build:
       context: .
       dockerfile: Dockerfile
+
     container_name: vijay_mod
+
     ports:
       - "9000:9000"
+
     environment:
       FLASK_APP: app.py
       FLASK_ENV: production
+
+    # Run as non-root user created in Dockerfile
+    user: appuser
+
+    # Make root filesystem read-only
+    read_only: true
+
+    # Allow only required writable locations
+    tmpfs:
+      - /tmp
+      - /run
+
+    # Drop all Linux capabilities
+    cap_drop:
+      - ALL
+
+    # Prevent privilege escalation
+    security_opt:
+      - no-new-privileges:true
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          memory: 256M
+
+    # Restart policy
     restart: unless-stopped
+
+    # Isolated network
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    driver: bridge
