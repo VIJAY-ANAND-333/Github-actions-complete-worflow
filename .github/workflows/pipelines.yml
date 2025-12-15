@@ -1,0 +1,40 @@
+name: Dev Pipeline
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  sast:
+    needs: lint
+    uses: ./.github/workflows/sast.yml
+
+  dependencies-scan:
+    needs: sast
+    uses: ./.github/workflows/dependencies-scan.yml
+
+  build:
+    needs: dependencies-scan
+    uses: ./.github/workflows/build.yml
+    with:
+      image_tag: dev
+
+  scan:
+    needs: build
+    uses: ./.github/workflows/scan.yml
+    with:
+      image: vj
+      image_tag: dev
+      environment: dev
+
+  deploy:
+    needs: scan
+    uses: ./.github/workflows/deploy.yml
+    with:
+      image_tag: dev
+    secrets:
+      inherit

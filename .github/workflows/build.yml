@@ -1,0 +1,28 @@
+name: Build Docker
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: docker build -t vj:${{ inputs.image_tag }} .
+
+      - name: Save Docker image to tarball
+        run: docker save vj:${{ inputs.image_tag }} -o vj-${{ inputs.image_tag }}.tar
+
+      - name: Upload Docker image as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ inputs.image_tag }}
+          path: vj-${{ inputs.image_tag }}.tar

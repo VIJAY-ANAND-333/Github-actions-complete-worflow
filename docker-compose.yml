@@ -1,0 +1,12 @@
+services:
+  vijay_mod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vijay_mod
+    ports:
+      - "9000:9000"
+    environment:
+      FLASK_APP: app.py
+      FLASK_ENV: production
+    restart: unless-stopped
