@@ -6,9 +6,6 @@ on:
       image_tag:
         required: true
         type: string
-    # secrets:
-    #   EC2_SSH_KEY:
-    #     required: true
 
 jobs:
   deploy:
@@ -16,37 +13,32 @@ jobs:
     environment: dev
 
     steps:
-      - name: Debug SSH Key
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy via AWS SSM
         run: |
-          echo "Checking if SSH key exists..."
-          if [ -n "${{ secrets.EC2_SSH_KEY }}" ]; then
-            echo "SSH key is present in vars"
-            echo "Key starts with: $(echo '${{ secrets.EC2_SSH_KEY }}' | head -c 30)"
-            echo "Key ends with: $(echo '${{ secrets.EC2_SSH_KEY }}' | tail -c 30)"
-          else
-            echo "SSH key is empty or missing!"
-          fi
+          aws ssm send-command \
+            --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy dev build" \
+            --parameters 'commands=[
+              "set -e",
+              "sudo -u ubuntu bash -lc \"cd /home/ubuntu/prod_CI && git checkout dev && git pull origin dev && make rebuild && make clean\""
+            ]' \
+            --timeout-seconds 600
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{vars.SERVER_IP }}
-          username: ${{vars.SERVER_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/prod_CI
-            git checkout dev
-            git pull origin dev
-            make rebuild
-            make clean
-
-      - name: Rollback if failure or cancel
+      - name: Rollback on failure
         if: failure() || cancelled()
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ vars.SERVER_IP }}
-          username: ${{ vars.SERVER_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/prod_CI
-            make rollback
+        run: |
+          aws ssm send-command \
+            --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Rollback deployment" \
+            --parameters 'commands=[
+              "sudo -u ubuntu bash -lc \"cd /home/ubuntu/prod_CI && make rollback\""
+            ]'
